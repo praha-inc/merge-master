@@ -56344,6 +56344,11 @@ const run = async () => {
     try {
         const token = _actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput('github-token', { required: true });
         const octokit = _actions_github__WEBPACK_IMPORTED_MODULE_1__.getOctokit(token);
+        const externalRebaseAuthors = _actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput('external-rebase-authors')
+            .split(',')
+            .map((s) => s.trim().toLowerCase())
+            .filter(Boolean);
+        const isExternalRebaseAuthor = (login) => externalRebaseAuthors.includes(login.toLowerCase());
         const owner = _actions_github__WEBPACK_IMPORTED_MODULE_1__.context.repo.owner;
         const repo = _actions_github__WEBPACK_IMPORTED_MODULE_1__.context.repo.repo;
         const { data: { default_branch: defaultBranch } } = await octokit.rest.repos.get({ owner, repo });
@@ -56370,7 +56375,7 @@ const run = async () => {
         const targetPRs = await octokit.graphql((0,graphql__WEBPACK_IMPORTED_MODULE_3__.print)(query), { owner, repo, defaultBranch })
             .then((resp) => resp.repository.pullRequests.nodes.filter((pr) => [
             pr.autoMergeRequest,
-            pr.mergeable === 'MERGEABLE' || (pr.author.login === 'renovate' && pr.mergeable === 'CONFLICTING'),
+            pr.mergeable === 'MERGEABLE' || (isExternalRebaseAuthor(pr.author.login) && pr.mergeable === 'CONFLICTING'),
             pr.statusCheckRollup && pr.statusCheckRollup.state !== 'FAILURE',
             !pr.isDraft,
         ].every(Boolean)));
@@ -56382,11 +56387,11 @@ const run = async () => {
             _actions_core__WEBPACK_IMPORTED_MODULE_0__.info('There is a PR that is following the base branch and CI is running');
             return;
         }
-        const targetPR = targetPRs.find((pr) => pr.author.login !== 'renovate') || targetPRs[0];
-        if (targetPR.author.login === 'renovate') {
-            _actions_core__WEBPACK_IMPORTED_MODULE_0__.info(`Rebase Renovate PR: ${targetPR.number}`);
+        const targetPR = targetPRs.find((pr) => !isExternalRebaseAuthor(pr.author.login)) || targetPRs[0];
+        if (isExternalRebaseAuthor(targetPR.author.login)) {
+            _actions_core__WEBPACK_IMPORTED_MODULE_0__.info(`External rebase PR: ${targetPR.number}`);
             if (targetPR.labels.nodes.some(({ name }) => name === 'rebase')) {
-                _actions_core__WEBPACK_IMPORTED_MODULE_0__.info('This PR is already rebasing by Renovate');
+                _actions_core__WEBPACK_IMPORTED_MODULE_0__.info('This PR is already rebasing');
                 return;
             }
             await octokit.rest.issues.addLabels({

@@ -4,6 +4,10 @@ inputs:
   github-token:
     description: 'Github Token'
     required: true
+  external-rebase-authors:
+    description: 'Comma-separated list of author login names that handle rebase themselves via label (e.g. "renovate,dependabot")'
+    required: false
+    default: 'renovate,dependabot'
 runs:
   using: 'node20'
   main: 'dist/index.js'
