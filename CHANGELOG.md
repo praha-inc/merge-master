@@ -1,5 +1,11 @@
 # merge-master
 
+## 1.2.0
+
+### Minor Changes
+
+- 040c2f4: 外部リベース対応の author を configurable にした
+
 ## 1.1.1
 
 ### Patch Changes

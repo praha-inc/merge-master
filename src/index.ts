@@ -31,6 +31,12 @@ const run = async (): Promise<void> => {
     const token = core.getInput('github-token', { required: true });
     const octokit = github.getOctokit(token);
 
+    const externalRebaseAuthors = core.getInput('external-rebase-authors')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    const isExternalRebaseAuthor = (login: string) => externalRebaseAuthors.includes(login.toLowerCase());
+
     const owner = github.context.repo.owner;
     const repo = github.context.repo.repo;
 
@@ -62,7 +68,7 @@ const run = async (): Promise<void> => {
         resp.repository.pullRequests.nodes.filter((pr) =>
           [
             pr.autoMergeRequest,
-            pr.mergeable === 'MERGEABLE' || (pr.author.login === 'renovate' && pr.mergeable === 'CONFLICTING'),
+            pr.mergeable === 'MERGEABLE' || (isExternalRebaseAuthor(pr.author.login) && pr.mergeable === 'CONFLICTING'),
             pr.statusCheckRollup && pr.statusCheckRollup.state !== 'FAILURE',
             !pr.isDraft,
           ].every(Boolean),
@@ -79,12 +85,12 @@ const run = async (): Promise<void> => {
       return;
     }
 
-    const targetPR = targetPRs.find((pr) => pr.author.login !== 'renovate') || targetPRs[0]!;
+    const targetPR = targetPRs.find((pr) => !isExternalRebaseAuthor(pr.author.login)) || targetPRs[0]!;
 
-    if (targetPR.author.login === 'renovate') {
-      core.info(`Rebase Renovate PR: ${targetPR.number}`);
+    if (isExternalRebaseAuthor(targetPR.author.login)) {
+      core.info(`External rebase PR: ${targetPR.number}`);
       if (targetPR.labels.nodes.some(({ name }) => name === 'rebase')) {
-        core.info('This PR is already rebasing by Renovate');
+        core.info('This PR is already rebasing');
         return;
       }
       await octokit.rest.issues.addLabels({
